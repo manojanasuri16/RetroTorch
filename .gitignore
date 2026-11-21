@@ -1,0 +1,12 @@
+# build output (releases are on GitHub Releases)
+pys60/build/
+pys60/dist/
+native/out/
+native/build.log
+# signing key: never commit
+pys60/cert/
+*.pem
+# misc
+*.pyc
+retrotorch_log*.txt
+retrotorch.cfg

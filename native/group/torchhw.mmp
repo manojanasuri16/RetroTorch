@@ -1,0 +1,22 @@
+// torchhw.pyd: native light/camera-flash helper for RetroTorch (PyS60 1.4.5)
+TARGET          torchhw.pyd
+TARGETTYPE      dll
+UID             0x1000008d 0xE7A3D5C5
+// A PYD needs at least the capabilities of the app that loads it; these are
+// the ones a self-signed certificate can grant (UserEnvironment: camera).
+CAPABILITY      LocalServices NetworkServices ReadUserData WriteUserData UserEnvironment
+VENDORID        0
+EPOCALLOWDLLDATA
+
+SOURCEPATH      ..\src
+SOURCE          torchhw.cpp
+
+USERINCLUDE     ..\src
+SYSTEMINCLUDE   \epoc32\include
+SYSTEMINCLUDE   \epoc32\include\python
+SYSTEMINCLUDE   \epoc32\include\libc
+
+LIBRARY         python222.lib euser.lib hwrmlightclient.lib ecam.lib ecamadvsettings.lib fbscli.lib
+
+// the export list (inittorchhw at ordinal 1) is ..\eabi\torchhw.def
+NOSTRICTDEF
