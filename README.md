@@ -6,6 +6,7 @@ A torch app for the **Nokia N79** and other S60 3rd Edition phones. Its main lig
 |---|---|
 | **Phones** | Nokia S60 3rd Edition (FP1/FP2); written for and tested on a Nokia N79 |
 | **Needs** | Python for S60 1.4.5 |
+| **Install** | Phone memory or memory card (tested on the N79 from the memory card) |
 
 ---
 
@@ -17,6 +18,7 @@ A torch app for the **Nokia N79** and other S60 3rd Edition phones. Its main lig
 - [Troubleshooting](#troubleshooting)
 - [Memory card](#memory-card)
 - [How it works](#how-it-works)
+- [More apps for the Nokia N79](#more-apps-for-the-nokia-n79)
 - [Building](#building)
 - [Project layout](#project-layout)
 
@@ -91,6 +93,7 @@ A Python for S60 1.4.5 app on a **different drive from Python itself** normally 
 
 RetroTorch handles this itself. Its package includes a copy of the file and a tiny native program, `retrotorch_rscfix.exe`, that the installer runs once after installing. If the file is missing on the drive RetroTorch went to, the program copies it there. So RetroTorch works from phone memory or the memory card, with Python for S60 on either. (A Python-side fix can't work: PyS60 loads `appuifw` before it runs any of the app's Python code.)
 
+- Tested on a Nokia N79, with RetroTorch, RetroSend and RetroTele all installed on the memory card and Python for S60 in phone memory.
 - Writing into `\resource` needs an **unlocked phone** (e.g. the Open4All patch). On a phone that isn't unlocked, install RetroTorch on the same drive as Python, or copy `appuifwmodule.rsc` (attached to the release) into `resource\apps\` on the app's drive with the phone in USB *Mass storage* mode.
 - A `.sis` can't install the file: the phone refuses with "Update error", because it would "eclipse" Python's own copy on the other drive.
 - The same fix works for any Python for S60 1.4.5 app: see [`pys60/card/README.md`](pys60/card/README.md), [`native/rscfix/rscfix.cpp`](native/rscfix/rscfix.cpp) and [`pys60/tools/py2sis_rscfix.py`](pys60/tools/py2sis_rscfix.py).
@@ -107,6 +110,13 @@ Things learned on a real N79:
 - The camera reports **video light** as a supported flash mode, and setting it returns no error. But the LED stays dark until the camera is in **video mode** (video capture prepared, viewfinder running off screen); then the video light comes on.
 - **Touching the camera while the screen is being drawn** (even counting cameras, or importing PyS60's `camera` module) closes the app without any Python error. RetroTorch only touches hardware after the UI is up, inside the crash guard.
 - The N79's light targets are `0x83`: display, keypad and custom target 4.
+
+## More apps for the Nokia N79
+
+- **[RetroSend](https://github.com/manojanasuri16/RetroSend)**: send and receive files and text with the LocalSend app on phones and computers, over Wi-Fi.
+- **[RetroTele](https://github.com/manojanasuri16/RetroTele)**: a Telegram client that talks to Telegram directly, no PC or proxy needed.
+
+Like this app, both are Python for S60 1.4.5 apps that install to phone memory or the memory card.
 
 ## Building
 
