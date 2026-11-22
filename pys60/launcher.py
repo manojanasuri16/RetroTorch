@@ -5,8 +5,6 @@
 # not opening. Python 2.2 compatible.
 import sys
 import os
-import appuifw
-import e32
 
 UID = "e7a3d5c4"
 
@@ -33,6 +31,9 @@ for _drive in ["C", "E"]:
         if _p not in sys.path:
             sys.path.insert(0, _p)
 _log("starter: app folder " + str(_here))
+
+import appuifw
+import e32
 
 
 def _fail(where):

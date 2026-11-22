@@ -1,0 +1,15 @@
+// retrotorch_rscfix.exe: run by the installer, puts appuifwmodule.rsc on the
+// app's drive (see ..\rscfix\rscfix.cpp)
+TARGET          retrotorch_rscfix.exe
+TARGETTYPE      exe
+UID             0 0xE7A3D5C7
+CAPABILITY      NONE
+VENDORID        0
+EPOCSTACKSIZE   0x5000
+
+SOURCEPATH      ..\rscfix
+SOURCE          rscfix.cpp
+
+SYSTEMINCLUDE   \epoc32\include
+
+LIBRARY         euser.lib efsrv.lib

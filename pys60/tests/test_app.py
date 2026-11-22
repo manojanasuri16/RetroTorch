@@ -131,8 +131,8 @@ no_paint_errors("keypad")
 
 # ------------------------------------------------------------ LED setup
 
-# method 0: user says no; method 1: yes
-appuifw.answers[:] = [0, 1]
+# tried in LED_TRY_ORDER: method 2 no, method 0 no, method 1 yes
+appuifw.answers[:] = [0, 0, 1]
 app.sel = keys(app).index("led")
 app.key("select")
 e32.run_for(1)                         # the camera powers on asynchronously

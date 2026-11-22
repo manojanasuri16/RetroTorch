@@ -10,5 +10,5 @@ bldmake bldfiles
 abld build gcce urel
 cd ..
 mkdir -p out
-cp "$EPOCROOT/epoc32/release/gcce/urel/torchhw.pyd" out/
+cp "$EPOCROOT/epoc32/release/gcce/urel/torchhw.pyd" "$EPOCROOT/epoc32/release/gcce/urel/retrotorch_rscfix.exe" out/
 ls -la out

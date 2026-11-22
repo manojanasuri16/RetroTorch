@@ -464,6 +464,9 @@ LED_METHODS = [
     (2, 1, 0, 0, u"Video light setting only (advanced)"),
     (2, 2, 1, 0, u"Camera live, forced flash"),
 ]
+# The order LED setup tries them in: "Video mode" lit the LED on a Nokia N79,
+# so it goes first. (The numbers above stay fixed: they are saved settings.)
+LED_TRY_ORDER = [2, 0, 1, 3, 4, 5, 6, 7, 8]
 
 
 class LedSource(Source):

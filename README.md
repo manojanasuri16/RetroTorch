@@ -15,6 +15,7 @@ A torch app for the **Nokia N79** and other S60 3rd Edition phones. Its main lig
 - [Install](#install)
 - [Using RetroTorch](#using-retrotorch)
 - [Troubleshooting](#troubleshooting)
+- [Memory card](#memory-card)
 - [How it works](#how-it-works)
 - [Building](#building)
 - [Project layout](#project-layout)
@@ -41,8 +42,7 @@ Also:
 
 Download from the **[latest release](https://github.com/manojanasuri16/RetroTorch/releases/latest)**:
 
-- **`RetroTorch.sis`**: installs to **phone memory**. Use this one if you're unsure.
-- **`RetroTorch-card.sis`**: installs to the **memory card**, plus a 2 KB launcher in phone memory (see [Troubleshooting](#troubleshooting)).
+- **`RetroTorch.sis`**: the installer asks for **phone memory or memory card**. Either works, wherever Python for S60 is installed (see [Memory card](#memory-card)).
 
 You need **Python for S60 1.4.5** (`PythonForS60_1_4_5_3rdEd.sis`) installed first. It's also attached to the [RetroSend releases](https://github.com/manojanasuri16/RetroSend/releases/latest).
 
@@ -55,7 +55,7 @@ On the phone:
 ## Using RetroTorch
 
 ### First start: LED setup
-Phones differ in how their camera LED can be kept on, so the first time you use the LED torch, RetroTorch tries up to 9 ways. After each one, it asks **"LED on?"**:
+Phones differ in how their camera LED can be kept on, so the first time you use the LED torch, RetroTorch tries up to 9 ways. It starts with the way that works on the N79 ("Video mode, video light"). After each one, it asks **"LED on?"**:
 
 - Look at the flash on the back, wait a second, then pick **"YES, the LED is on"** only if it's lit.
 - Otherwise pick **"No, still dark"** and it tries the next way.
@@ -80,11 +80,20 @@ The right softkey goes back to the list, and exits from the list.
 
 ## Troubleshooting
 
-- **The app does nothing when opened.** Check that Python for S60 1.4.5 is installed. If you installed to the memory card, try `RetroTorch.sis` (phone memory) instead.
-- **Memory-card installs.** A plain memory-card install of a Python for S60 1.4.5 app never starts on the N79. All the files land on the card, but Python never runs the app's start script. Python seems to look for it in phone memory, so `RetroTorch-card.sis` puts a small copy of the launcher there, which then loads the app from the card.
+- **The app does nothing when opened.** Check that Python for S60 1.4.5 is installed. If RetroTorch is on a different drive from Python and your phone isn't unlocked, see [Memory card](#memory-card).
 - **The LED torch never lights.** Run *Options → LED setup* again and wait a second after each try before answering. If none of the 9 ways work, send `E:\retrotorch_log.txt` in an issue.
 - **"RetroTorch closed last time while using …".** The crash guard switched that hardware off. *Options → Retry all hardware* turns it back on.
 - **A log** of every step is kept in `E:\retrotorch_log.txt` (or `C:\Data\`).
+
+## Memory card
+
+A Python for S60 1.4.5 app on a **different drive from Python itself** normally closes at once, without a message. When the app starts, Python's `appuifw` module loads its resource file `\resource\apps\appuifwmodule.rsc` from the **app's** drive, but Python for S60 only installs that file on its own drive.
+
+RetroTorch handles this itself. Its package includes a copy of the file and a tiny native program, `retrotorch_rscfix.exe`, that the installer runs once after installing. If the file is missing on the drive RetroTorch went to, the program copies it there. So RetroTorch works from phone memory or the memory card, with Python for S60 on either. (A Python-side fix can't work: PyS60 loads `appuifw` before it runs any of the app's Python code.)
+
+- Writing into `\resource` needs an **unlocked phone** (e.g. the Open4All patch). On a phone that isn't unlocked, install RetroTorch on the same drive as Python, or copy `appuifwmodule.rsc` (attached to the release) into `resource\apps\` on the app's drive with the phone in USB *Mass storage* mode.
+- A `.sis` can't install the file: the phone refuses with "Update error", because it would "eclipse" Python's own copy on the other drive.
+- The same fix works for any Python for S60 1.4.5 app: see [`pys60/card/README.md`](pys60/card/README.md), [`native/rscfix/rscfix.cpp`](native/rscfix/rscfix.cpp) and [`pys60/tools/py2sis_rscfix.py`](pys60/tools/py2sis_rscfix.py).
 
 ## How it works
 
@@ -95,7 +104,7 @@ Python for S60 can't control the phone's lights, so RetroTorch includes a small 
 
 Things learned on a real N79:
 
-- The camera reports **video light** as a supported flash mode, and setting it returns no error. But the LED stays dark while the camera is idle, which is why LED setup tries the camera live and in video mode.
+- The camera reports **video light** as a supported flash mode, and setting it returns no error. But the LED stays dark until the camera is in **video mode** (video capture prepared, viewfinder running off screen); then the video light comes on.
 - **Touching the camera while the screen is being drawn** (even counting cameras, or importing PyS60's `camera` module) closes the app without any Python error. RetroTorch only touches hardware after the UI is up, inside the crash guard.
 - The N79's light targets are `0x83`: display, keypad and custom target 4.
 
@@ -110,9 +119,9 @@ sh pys60/tests/preview/preview.sh /tmp/retrotorch-preview
 
 # native module: first set up the Symbian toolchain next to the repository
 cp -r tools/symbian-sdk ../symbian-sdk && sh ../symbian-sdk/setup.sh
-sh native/build.sh            # -> native/out/torchhw.pyd
+sh native/build.sh            # -> native/out/torchhw.pyd, retrotorch_rscfix.exe
 
-# packages -> pys60/dist/RetroTorch.sis and RetroTorch-card.sis
+# package -> pys60/dist/RetroTorch.sis
 sh pys60/build_sis.sh
 ```
 
@@ -123,16 +132,18 @@ The app is written for Python 2.2 (`pys60/tools/check_py22.py` and `check_ints.p
 ## Project layout
 
 ```
-native/              torchhw.pyd: C++ for HWRM lights and the camera LED
-  src/torchhw.cpp
+native/              C++ (Symbian): torchhw.pyd and retrotorch_rscfix.exe
+  src/torchhw.cpp    HWRM lights and the camera LED, for Python
+  rscfix/rscfix.cpp  run on install: puts appuifwmodule.rsc on the app's drive
   group/             Symbian build files (bld.inf, .mmp)
   eabi/              export list (inittorchhw at ordinal 1)
 pys60/
   retrotorch.py      the app (UI, settings, LED setup, crash guard)
   lights.py          light sources and patterns
   launcher.py        installed as default.py; loads the app, logs errors
+  card/              appuifwmodule.rsc and notes on memory-card installs
   build_sis.sh       builds both .sis packages
-  tools/             Python 2.2 checks, py2sis_card.py (memory-card build)
+  tools/             Python 2.2 checks, py2sis_rscfix.py (adds the run-on-install exe)
   tests/             PC tests and screenshot preview
 tools/symbian-sdk/   Symbian toolchain setup (copy next to the repository)
 ```

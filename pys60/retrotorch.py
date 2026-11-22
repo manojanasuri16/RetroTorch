@@ -13,7 +13,7 @@ import e32
 import graphics
 import key_codes
 
-VERSION = u"1.2.0"  # single source of truth: build_sis.sh reads this
+VERSION = u"1.3.0"  # single source of truth: build_sis.sh reads this
 APP = u"RetroTorch"
 
 _LOGFILE = None
@@ -897,8 +897,9 @@ class TorchApp:
         appuifw.note(u"LED setup: RetroTorch will try a few ways to light the LED. "
                      u"Look at the flash on the back.", "info")
         result = [None]
-        i = 0
-        while i < len(lights.LED_METHODS):
+        n = 0
+        while n < len(lights.LED_TRY_ORDER):
+            i = lights.LED_TRY_ORDER[n]
             api = lights.LED_METHODS[i][0]
             label = lights.LED_METHODS[i][-1]
             box = [None]
@@ -926,7 +927,7 @@ class TorchApp:
                     # "Yes" by accident in v1.0.5
                     ans = appuifw.popup_menu([u"No, still dark", u"YES, the LED is on",
                                               u"Stop testing"],
-                                             u"LED on? (%d of %d)" % (i + 1, len(lights.LED_METHODS)))
+                                             u"LED on? (%d of %d)" % (n + 1, len(lights.LED_TRY_ORDER)))
                     log("LED setup %d: answer %s" % (i, repr(ans)))
                     try:
                         led.apply(i, 0)
@@ -941,7 +942,7 @@ class TorchApp:
                 if msg and msg.find(u"in use") >= 0:
                     appuifw.note(msg, "error")
                     break
-            i = i + 1
+            n = n + 1
         led.shut()
         led.method = result[0]
         self.cfg["led_method"] = result[0]

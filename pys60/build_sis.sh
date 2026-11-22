@@ -4,12 +4,10 @@
 # Includes the native light module (../native/out/torchhw.pyd, made by
 # ../native/build.sh) when it exists; without it the app still works with the
 # screen light and flash bursts only.
-# Two packages:
-#   dist/RetroTorch.sis       installs to phone memory (C:)
-#   dist/RetroTorch-card.sis  installs to the memory card (E:), plus a 2 KB copy
-#                             of the launcher on C:. A plain card install never
-#                             starts on the N79 (default.py is never run), see
-#                             tools/py2sis_card.py.
+# One package, dist/RetroTorch.sis: the installer asks for phone memory or the
+# memory card. It works on either drive, wherever Python for S60 is installed:
+# retrotorch_rscfix.exe, run once by the installer, puts appuifw's resource
+# file on the app's drive (see card/README.md and tools/py2sis_rscfix.py).
 set -e
 cd "$(dirname "$0")"
 TOOLS=../../retrosend/tools
@@ -46,6 +44,13 @@ if [ -f ../native/out/torchhw.pyd ]; then
   cp ../native/out/torchhw.pyd build/app/root/sys/bin/
   EXTRAS="--extrasdir=root"
   echo "including native module torchhw.pyd"
+fi
+if [ -f ../native/out/retrotorch_rscfix.exe ]; then
+  mkdir -p build/app/root/sys/bin build/app/root/resource/retrotorch
+  cp ../native/out/retrotorch_rscfix.exe build/app/root/sys/bin/
+  cp card/tree/resource/apps/appuifwmodule.rsc build/app/root/resource/retrotorch/
+  EXTRAS="--extrasdir=root"
+  echo "including retrotorch_rscfix.exe (any-drive install)"
 else
   echo "WARNING: ../native/out/torchhw.pyd not built: LED torch and keypad light will be missing"
 fi
@@ -55,12 +60,10 @@ OPTS="--uid=0xE7A3D5C4 --appname=RetroTorch --version=$VERSION \
   --caps=LocalServices+NetworkServices+ReadUserData+WriteUserData+UserEnvironment \
   --heapsize=4k,4M $EXTRAS --cert=cert/retrotorch_cert.pem --privkey=cert/retrotorch_key.pem"
 
-# Phone memory build (works).
-$PY $ENS py2sis $OPTS --drive=C build/app dist/RetroTorch.sis </dev/null >build/py2sis.log
-# Memory card build: everything on E:, plus the launcher on C: (see tools/py2sis_card.py).
-$PY tools/py2sis_card.py "$(dirname $ENS)" $OPTS --drive=E build/app dist/RetroTorch-card.sis \
-  </dev/null >build/py2sis_card.log
-grep "file " build/py2sis_card.log
+rm -f dist/RetroTorch-card.sis dist/PyS60-CardSupport.sis dist/appuifwmodule.rsc
+$PY tools/py2sis_rscfix.py "$(dirname $ENS)" $OPTS --drive=any build/app dist/RetroTorch.sis \
+  </dev/null >build/py2sis.log
+grep "rscfix" build/py2sis.log
 cat build/py2sis.log | grep -i warn || true
 echo "built dist/RetroTorch.sis"
 ls -la dist
