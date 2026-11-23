@@ -127,6 +127,16 @@ Things learned on a real N79:
 
 Like this app, both are Python for S60 1.4.5 apps that install to phone memory or the memory card.
 
+## Source code of components
+
+The reusable parts of RetroTorch live in their own open-source repos (MIT):
+
+- [symbian-torch-pyd](https://github.com/manojanasuri16/symbian-torch-pyd): the native `torchhw.pyd` module (camera LED torch, HWRM lights, ECam flash).
+- [pys60-toolbox](https://github.com/manojanasuri16/pys60-toolbox): the memory-card fix (rscfix), packaging tools and Python 2.2 checkers.
+- [symbian-s60v3-toolchain](https://github.com/manojanasuri16/symbian-s60v3-toolchain): the Linux toolchain used to build the native module.
+
+The full list is on the [RetroArchive Open source page](https://manojanasuri16.github.io/RetroArchive/opensource/), and RetroTorch's own page is on [RetroArchive](https://manojanasuri16.github.io/RetroArchive/apps/retrotorch/).
+
 ## Building
 
 You need Linux, plus [RetroSend](https://github.com/manojanasuri16/RetroSend)'s `tools/` folder checked out next to this repository (its `setup.sh` provides ensymble and Python 2.7).
