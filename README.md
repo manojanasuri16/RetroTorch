@@ -13,6 +13,7 @@ A torch app for the **Nokia N79** and other S60 3rd Edition phones. Its main lig
 ## Contents
 
 - [Features](#features)
+- [Requirements](#requirements)
 - [Install](#install)
 - [Using RetroTorch](#using-retrotorch)
 - [Troubleshooting](#troubleshooting)
@@ -39,6 +40,14 @@ Also:
 - **Morse messages:** any text, flashed on any light.
 - **Crash guard:** if a piece of hardware ever makes the app close, RetroTorch switches that piece off at the next start and tells you. *Options → Retry all hardware* turns it back on.
 - **Hardware info:** lists the lights and camera flash modes your phone reports.
+
+## Requirements
+
+**RetroTorch does not need a hacked phone to install or run its features.** Every binary in the package (the Python app, the `torchhw.pyd` module and its native helper) is built with only user-grantable capabilities (NetworkServices, LocalServices, ReadUserData, WriteUserData, UserEnvironment; checked in the built files and in `pys60/build_sis.sh`), and the package is self-signed. On a stock S60 3rd Edition phone, set *Software installation* to **All** and *Online certificate check* to **Off** (App. mgr. > Options > Settings) so it accepts the self-signed package. The `torchhw.pyd` module talks to the camera LED and lights with only these capabilities; whether every light works on a stock phone has not been tested.
+
+**Only the memory-card option uses the hack.** To start from a different drive than Python, the installer runs a small helper that writes into `\resource`, which needs an unlocked phone (Easy Hack Kit: EasyHackKit 2.0, which installs **RomPatcher+**, with **Open4All rp+** ticked and applied before you install; see the [unlock guide](https://github.com/manojanasuri16/symbian-unlock-guide)). Without it you will see **"Update error"** or **"requested application access not granted"** if the phone refuses that step, or the app closes at once when run from a different drive than Python. Fix: install RetroTorch on the same drive as Python for S60, with no hack needed.
+
+(Tested on a hacked N79 only; the "stock phone" statement comes from the capability check above, not from a test on a stock phone.)
 
 ## Install
 
