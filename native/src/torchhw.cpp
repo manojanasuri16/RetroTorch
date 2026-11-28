@@ -1,11 +1,23 @@
-// torchhw: native helper for RetroTorch (Python for S60 1.4.5, S60 3rd FP2).
+// torchhw: native helper for RetroTorch (Python for S60 1.4.5).
 //
 // Gives Python the light hardware that PyS60 itself does not expose:
 //   * HWRM Light (CHWRMLight): display backlight, keypad light and any
 //     extra light targets the phone reports, with intensity and blinking.
 //   * ECam (CCamera): the camera's LED flash. A continuous "video light"
 //     is what makes a real torch; several ways of switching it on are
-//     tried, because phones differ (see cam_light()).
+//     tried, because phones differ.
+//
+// Two builds come from this file:
+//   torchhw.pyd      S60 3rd Edition FP2: HWRM lights + ECam camera.
+//   torchhw_fp1.pyd  S60 3rd Edition FP1 (defined TORCHHW_FP1): HWRM lights
+//                    only. FP1 ECam (Symbian OS 9.2) has no New2L, no
+//                    MCameraObserver2 and no CCameraAdvancedSettings, and the
+//                    FP1 phones that have a camera light at all (N82) use a
+//                    xenon tube, which cannot be held on. Linking those APIs
+//                    into the module would stop it loading on FP1, taking the
+//                    keypad and extra lights down with it, so this build
+//                    leaves the camera out and Python uses PyS60's own camera
+//                    module for photo-flash bursts there.
 //
 // Everything runs in the Python thread. Camera callbacks arrive through
 // the active scheduler while Python waits (e32.ao_sleep / Ao_lock), and
@@ -15,9 +27,11 @@
 #include <e32base.h>
 #include <e32std.h>
 #include <hwrmlight.h>
+#ifndef TORCHHW_FP1
 #include <ecam.h>
 #include <ecamadvancedsettings.h>
 #include <fbs.h>
+#endif
 
 #include "Python.h"
 #include "symbian_python_ext_util.h"
@@ -63,6 +77,8 @@ static TInt LightInit()
 }
 
 // --------------------------------------------------------------- camera
+
+#ifndef TORCHHW_FP1
 
 enum TCamState {
     ECamClosed = 0,
@@ -298,11 +314,30 @@ public:
 
 static CTorchCamera* g_cam = NULL;
 
+#endif  // TORCHHW_FP1: no camera at all (see the top of the file)
+
+// Which camera APIs this build can use: bit 0 = CCamera::NewL (classic),
+// bit 1 = CCamera::New2L (FP2, extended flash modes). 0 = no camera code.
+static TInt CamApiMask()
+{
+#ifdef TORCHHW_FP1
+    return 0;
+#else
+    return 3;
+#endif
+}
+
 // --------------------------------------------------------------- Python
 
 static PyObject* py_version(PyObject* /*self*/, PyObject* /*args*/)
 {
-    return Py_BuildValue("i", 2);
+    return Py_BuildValue("i", 3);
+}
+
+// cam_apis() -> bit mask of camera APIs this build supports (see above)
+static PyObject* py_cam_apis(PyObject* /*self*/, PyObject* /*args*/)
+{
+    return Py_BuildValue("i", CamApiMask());
 }
 
 static PyObject* py_log(PyObject* /*self*/, PyObject* /*args*/)
@@ -403,53 +438,81 @@ static PyObject* py_light_reserve(PyObject* /*self*/, PyObject* args)
 
 static PyObject* py_cam_count(PyObject* /*self*/, PyObject* /*args*/)
 {
+#ifdef TORCHHW_FP1
+    return Py_BuildValue("i", 0);
+#else
     return Py_BuildValue("i", CCamera::CamerasAvailable());
+#endif
 }
 
 // cam_open(index=0, api=2) -> error code; then poll cam_state()
 static PyObject* py_cam_open(PyObject* /*self*/, PyObject* args)
 {
+#ifdef TORCHHW_FP1
+    (void)args;
+    return Py_BuildValue("i", KErrNotSupported);
+#else
     int index = 0, api = 2;
     if (!PyArg_ParseTuple(args, "|ii", &index, &api))
         return NULL;
+    if (!(CamApiMask() & (1 << (api - 1))))
+        return Py_BuildValue("i", KErrNotSupported);
     if (!g_cam) {
         g_cam = new CTorchCamera;
         if (!g_cam)
             return Py_BuildValue("i", KErrNoMemory);
     }
     return Py_BuildValue("i", g_cam->Open(index, api));
+#endif
 }
 
 // cam_state() -> (state, error, info_flash_modes, adv_flash_modes, frames)
 static PyObject* py_cam_state(PyObject* /*self*/, PyObject* /*args*/)
 {
+#ifdef TORCHHW_FP1
+    return Py_BuildValue("(iiiii)", 0, 0, 0, -1, 0);
+#else
     if (!g_cam)
         return Py_BuildValue("(iiiii)", ECamClosed, 0, 0, -1, 0);
     return Py_BuildValue("(iiiii)", g_cam->iState, g_cam->iErr, g_cam->InfoModes(),
                          g_cam->AdvModes(), g_cam->iFrames);
+#endif
 }
 
 // cam_flash(mode, method=0) -> error code (mode: CCamera::TFlash bits)
 static PyObject* py_cam_flash(PyObject* /*self*/, PyObject* args)
 {
+#ifdef TORCHHW_FP1
+    (void)args;
+    return Py_BuildValue("i", KErrNotSupported);
+#else
     int mode, method = 0;
     if (!PyArg_ParseTuple(args, "i|i", &mode, &method))
         return NULL;
     if (!g_cam)
         return Py_BuildValue("i", KErrNotReady);
     return Py_BuildValue("i", g_cam->SetFlash(mode, method));
+#endif
 }
 
 static PyObject* py_cam_flash_mode(PyObject* /*self*/, PyObject* /*args*/)
 {
+#ifdef TORCHHW_FP1
+    return Py_BuildValue("i", -1);
+#else
     if (!g_cam)
         return Py_BuildValue("i", -1);
     return Py_BuildValue("i", g_cam->Flash());
+#endif
 }
 
 // cam_viewfinder(on) -> error code
 static PyObject* py_cam_viewfinder(PyObject* /*self*/, PyObject* args)
 {
+#ifdef TORCHHW_FP1
+    (void)args;
+    return Py_BuildValue("i", KErrNotSupported);
+#else
     int on;
     if (!PyArg_ParseTuple(args, "i", &on))
         return NULL;
@@ -459,23 +522,31 @@ static PyObject* py_cam_viewfinder(PyObject* /*self*/, PyObject* args)
     if (on)
         b = ETrue;
     return Py_BuildValue("i", g_cam->Viewfinder(b));
+#endif
 }
 
 // cam_video(level) -> error code; 0 off, 1 prepared, 2 recording frames
 static PyObject* py_cam_video(PyObject* /*self*/, PyObject* args)
 {
+#ifdef TORCHHW_FP1
+    (void)args;
+    return Py_BuildValue("i", KErrNotSupported);
+#else
     int level;
     if (!PyArg_ParseTuple(args, "i", &level))
         return NULL;
     if (!g_cam)
         return Py_BuildValue("i", KErrNotReady);
     return Py_BuildValue("i", g_cam->Video(level));
+#endif
 }
 
 static PyObject* py_cam_close(PyObject* /*self*/, PyObject* /*args*/)
 {
+#ifndef TORCHHW_FP1
     if (g_cam)
         g_cam->Close();
+#endif
     Log("cam closed");
     Py_INCREF(Py_None);
     return Py_None;
@@ -484,10 +555,12 @@ static PyObject* py_cam_close(PyObject* /*self*/, PyObject* /*args*/)
 // close() frees everything (the app calls it on exit)
 static PyObject* py_close(PyObject* /*self*/, PyObject* /*args*/)
 {
+#ifndef TORCHHW_FP1
     if (g_cam) {
         delete g_cam;
         g_cam = NULL;
     }
+#endif
     if (g_light) {
         delete g_light;
         g_light = NULL;
@@ -498,6 +571,7 @@ static PyObject* py_close(PyObject* /*self*/, PyObject* /*args*/)
 
 static const PyMethodDef torchhw_methods[] = {
     {"version", (PyCFunction)py_version, METH_VARARGS, NULL},
+    {"cam_apis", (PyCFunction)py_cam_apis, METH_VARARGS, NULL},
     {"log", (PyCFunction)py_log, METH_VARARGS, NULL},
     {"light_targets", (PyCFunction)py_light_targets, METH_VARARGS, NULL},
     {"light_on", (PyCFunction)py_light_on, METH_VARARGS, NULL},

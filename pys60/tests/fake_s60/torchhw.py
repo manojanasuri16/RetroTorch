@@ -7,7 +7,11 @@ cam_fail = [0]
 
 
 def version():
-    return 1
+    return 3
+
+
+def cam_apis():
+    return 3            # this stand-in is the full FP2 build (1 = NewL, 2 = New2L)
 
 
 def log():

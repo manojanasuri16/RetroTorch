@@ -1,5 +1,5 @@
-# RetroTorch: a torch for Python for S60 1.4.5 (Nokia N79 and other S60
-# 3rd Edition phones). Uses every light the phone has: the screen (any
+# RetroTorch: a torch for Python for S60 1.4.5 (Nokia N79, N82 and other S60
+# 3rd Edition phones, FP1 and FP2). Uses every light the phone has: the screen (any
 # colour, brightness, effects), the camera's dual LED as a steady torch or
 # as flash bursts, the keypad light and any extra lights the phone reports.
 #
@@ -13,7 +13,7 @@ import e32
 import graphics
 import key_codes
 
-VERSION = u"1.3.0"  # single source of truth: build_sis.sh reads this
+VERSION = u"1.4.0"  # single source of truth: build_sis.sh reads this
 APP = u"RetroTorch"
 
 _LOGFILE = None
@@ -378,7 +378,11 @@ class TorchApp:
             appuifw.note(u"RetroTorch closed last time while using: " +
                          HW_NAMES.get(self.crashed, unicode(self.crashed)) +
                          u". It is now switched off (Options > Retry all hardware).", "info")
-        start = self.cfg.get("start", "led")      # the LED torch, unless changed
+        # the LED torch, unless changed; the screen light on a phone whose
+        # camera has no video light (S60 3rd Edition FP1)
+        start = self.cfg.get("start")
+        if start is None:
+            start = lights.default_start()
         for s in self.sources:
             if s.key == start and self.status(s)[0]:
                 log("start: turning on " + start)
@@ -516,6 +520,8 @@ class TorchApp:
                 return (0, u"Switched off: it crashed the app")
             if lights.torchhw is None:
                 return (0, u"Needs torchhw module (see Hardware info)")
+            if not lights.cam_apis():
+                return (0, u"Not on this phone (no camera video light)")
             if not s.available():
                 return (0, u"No camera found")
             if s.method is None:
@@ -892,14 +898,21 @@ class TorchApp:
         if lights.torchhw is None:
             appuifw.note(u"The torchhw module is missing", "error")
             return
+        order = lights.led_methods()
+        if not order:
+            appuifw.note(u"The LED torch needs a camera 'video light', which this "
+                         u"phone does not have: S60 3rd Edition FP1 phones such as "
+                         u"the N82 have a xenon flash, which cannot stay on. "
+                         u"Use the Screen light or Flash bursts instead.", "info")
+            return
         if self.on and self.src is not None:
             self.light_off()
         appuifw.note(u"LED setup: RetroTorch will try a few ways to light the LED. "
                      u"Look at the flash on the back.", "info")
         result = [None]
         n = 0
-        while n < len(lights.LED_TRY_ORDER):
-            i = lights.LED_TRY_ORDER[n]
+        while n < len(order):
+            i = order[n]
             api = lights.LED_METHODS[i][0]
             label = lights.LED_METHODS[i][-1]
             box = [None]
@@ -927,7 +940,7 @@ class TorchApp:
                     # "Yes" by accident in v1.0.5
                     ans = appuifw.popup_menu([u"No, still dark", u"YES, the LED is on",
                                               u"Stop testing"],
-                                             u"LED on? (%d of %d)" % (n + 1, len(lights.LED_TRY_ORDER)))
+                                             u"LED on? (%d of %d)" % (n + 1, len(order)))
                     log("LED setup %d: answer %s" % (i, repr(ans)))
                     try:
                         led.apply(i, 0)
@@ -1027,6 +1040,9 @@ class TorchApp:
     def show_info(self):
         lines = []
         lines.append(u"RetroTorch %s" % VERSION)
+        p = lights.s60_platform()
+        if p:
+            lines.append(u"Phone: " + p)
         try:
             lines.append(u"Python for S60 %s, S60 %s" % (e32.pys60_version,
                                                           str(e32.s60_version_info)))
@@ -1037,9 +1053,13 @@ class TorchApp:
             lines.append(u"Without it: screen light and flash bursts only.")
         else:
             try:
-                lines.append(u"Native module: torchhw v%d" % lights.torchhw.version())
+                lines.append(u"Native module: %s v%d" % (lights.NATIVE_NAME,
+                                                        lights.torchhw.version()))
             except:
-                lines.append(u"Native module: torchhw (version unknown)")
+                lines.append(u"Native module: %s (version unknown)" % lights.NATIVE_NAME)
+            if not lights.cam_apis():
+                lines.append(u"No camera in the native module (S60 3rd Edition FP1): "
+                             u"the LED torch is not available here.")
             m = lights.light_targets()
             lines.append(u"")
             lines.append(u"Light targets (HWRM): " + lights.targets_text(m))
@@ -1050,7 +1070,9 @@ class TorchApp:
                     probe_end("camera")
             except:
                 pass
-            if self.led.method is None:
+            if not lights.cam_apis():
+                pass
+            elif self.led.method is None:
                 lines.append(u"LED torch: not set up")
             else:
                 lines.append(u"LED torch: " + lights.LED_METHODS[self.led.method][-1])
@@ -1058,16 +1080,14 @@ class TorchApp:
                 lines.append(u"(turn the light off to probe the camera)")
             elif lights.OFF.has_key("led"):
                 lines.append(u"(native camera switched off)")
-            else:
+            elif lights.cam_apis():
                 lines = lines + self.probe_camera()
         try:
             if lights.OFF.has_key("camera"):
                 raise RuntimeError("switched off")
             import camera
             lines.append(u"")
-            lines.append(u"PyS60 camera flash modes: " +
-                         unicode(", ".join(camera.flash_modes())))
-            camera.release()
+            lines.append(u"PyS60 camera flash modes: " + lights.camera_flash_modes())
         except:
             lines.append(u"PyS60 camera module: " + unicode(err_text()))
         off = self.cfg.get("off", [])
@@ -1083,7 +1103,7 @@ class TorchApp:
 
     def probe_camera(self):
         out = []
-        for api in [2, 1]:
+        for api in lights.cam_api_list():
             box = [None]
             lk = e32.Ao_lock()
 
@@ -1141,7 +1161,9 @@ class TorchApp:
             u"Left/Right colour, * and # change the effect, any other key turns it off.",
             u"",
             u"LED torch: the camera's LED as a steady light. The first time, "
-            u"LED setup asks you whether the LED lit up, and remembers what works.",
+            u"LED setup asks you whether the LED lit up, and remembers what works. "
+            u"Phones without a camera video light (S60 3rd Edition FP1, e.g. the "
+            u"N82, which has a xenon flash) offer the screen light instead.",
             u"",
             u"Flash bursts: fires the camera flash like taking photos. Works without "
             u"the native module but is slow.",
@@ -1154,7 +1176,10 @@ class TorchApp:
         ]))
 
     def about(self):
-        appuifw.note(u"RetroTorch %s\nEvery light on your N79" % VERSION, "info")
+        p = lights.s60_platform()
+        if not p:
+            p = u"S60 3rd Edition"
+        appuifw.note(u"RetroTorch %s\nEvery light on your phone (%s)" % (VERSION, p), "info")
 
     # ---------------------------------------------------------- exit
 

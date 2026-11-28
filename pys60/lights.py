@@ -20,13 +20,24 @@
 
 import e32
 
-try:
-    import torchhw
-    NATIVE_ERR = None
-except:
-    import sys
-    torchhw = None
-    NATIVE_ERR = str(sys.exc_info()[1])
+# The native module comes in two builds (see native/src/torchhw.cpp):
+#   torchhw       S60 3rd Edition FP2: HWRM lights + the ECam camera
+#   torchhw_fp1   S60 3rd Edition FP1: HWRM lights only
+# The FP2 build is tried first; on an FP1 phone it cannot load (its camera
+# APIs do not exist there), so the FP1 build follows. Finding neither is fine:
+# the app then uses the screen light and PyS60's photo-flash bursts.
+torchhw = None
+NATIVE_NAME = None
+NATIVE_ERR = None
+for _mod in ("torchhw", "torchhw_fp1"):
+    try:
+        torchhw = __import__(_mod)
+        NATIVE_NAME = _mod
+        break
+    except:
+        import sys
+        NATIVE_ERR = str(sys.exc_info()[1])
+        torchhw = None
 
 # CHWRMLight::TLightTarget
 T_DISPLAY = 0x1
@@ -182,6 +193,99 @@ def camera_count():
         return camera.cameras_available()
     except:
         return 1
+
+
+def cam_apis():
+    """Camera APIs the native module can use: bit 0 = CCamera::NewL (classic),
+    bit 1 = CCamera::New2L (S60 3rd Edition FP2, extended flash modes).
+    0 = the FP1 build: no camera code at all. torchhw.pyd before v3 has no
+    cam_apis() and is the full FP2 build."""
+    if torchhw is None:
+        return 0
+    try:
+        return torchhw.cam_apis()
+    except:
+        return 3
+
+
+def api_bit(api):
+    """The cam_apis() bit for camera api 1, 2, ... (no <<: Python 2.2)."""
+    bit = 1
+    i = 1
+    while i < api:
+        bit = bit * 2
+        i = i + 1
+    return bit
+
+
+def cam_api_list():
+    """cam_apis() as a list, newest first."""
+    apis = cam_apis()
+    out = []
+    if apis & 2:
+        out.append(2)
+    if apis & 1:
+        out.append(1)
+    return out
+
+
+def led_methods():
+    """Indices into LED_METHODS this phone's native module can try, in
+    LED_TRY_ORDER. Empty on an FP1 phone: its camera light (where it has one)
+    cannot be held on."""
+    apis = cam_apis()
+    out = []
+    n = 0
+    while n < len(LED_TRY_ORDER):
+        i = LED_TRY_ORDER[n]
+        api = LED_METHODS[i][0]
+        if apis & api_bit(api):
+            out.append(i)
+        n = n + 1
+    return out
+
+
+def default_start():
+    """What Options > Turn on at start uses until it is changed: the LED torch,
+    or the screen light on a phone whose camera has no video light (S60 3rd
+    Edition FP1)."""
+    if cam_apis():
+        return "led"
+    return "screen"
+
+
+def s60_platform():
+    """The phone's S60 version as text ("S60 3.1 (FP1)"), or u"" if PyS60
+    does not report it."""
+    try:
+        v = e32.s60_version_info
+    except:
+        return u""
+    try:
+        major = int(v[0])
+        minor = int(v[1])
+    except:
+        return str(v)
+    names = {3: {0: u"S60 3.0", 1: u"S60 3.1 (FP1)", 2: u"S60 3.2 (FP2)"},
+             5: {0: u"S60 5th Edition"}}
+    if names.has_key(major) and names[major].has_key(minor):
+        return names[major][minor]
+    return u"S60 %d.%d" % (major, minor)
+
+
+def camera_flash_modes():
+    """PyS60's photo flash modes ("forced" = flash bursts work), or a reason."""
+    try:
+        import camera
+        modes = camera.flash_modes()
+        try:
+            camera.release()
+        except:
+            pass
+        return unicode(", ".join(modes))
+    except:
+        import sys
+        return unicode(str(sys.exc_info()[1]))
 
 
 # --------------------------------------------------------------- colours
@@ -452,6 +556,8 @@ class HwrmSource(Source):
 #   video 0 = no, 1 = video capture prepared, 2 = video frames running
 # On the N79 the video light mode is accepted without error but the LED stays
 # dark while the camera is idle (v1.0.5 log), so the live-camera ways go first.
+# led_methods() drops the ones whose camera API this phone's native module does
+# not have, so an FP1 phone (torchhw_fp1.pyd: no camera) offers none of them.
 LED_VERSION = 2
 LED_METHODS = [
     (2, 0, 1, 0, u"Camera live, video light"),
@@ -486,6 +592,8 @@ class LedSource(Source):
         # touching the camera then took the whole app down on the N79.
         if torchhw is None or OFF.has_key("led"):
             return 0
+        if not cam_apis():
+            return 0        # FP1 build: no camera code in the native module
         return 1
 
     def state(self):
@@ -536,6 +644,9 @@ class LedSource(Source):
             done(0, u"setup")
             return
         api = LED_METHODS[self.method][0]
+        if not cam_apis() & api_bit(api):
+            done(0, u"This phone cannot switch the camera light on")
+            return
         self.open(api, done)
 
     def apply(self, method, on):

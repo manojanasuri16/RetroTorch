@@ -39,20 +39,27 @@ cp launcher.py build/app/default.py
 cp retrotorch.py build/app/rtorch_app.py
 cp $MODULES build/app/
 EXTRAS=""
-if [ -f ../native/out/torchhw.pyd ]; then
-  mkdir -p build/app/root/sys/bin
-  cp ../native/out/torchhw.pyd build/app/root/sys/bin/
-  EXTRAS="--extrasdir=root"
-  echo "including native module torchhw.pyd"
-fi
+# Both native builds go in: torchhw.pyd for S60 3rd Edition FP2, torchhw_fp1.pyd
+# for FP1 phones (N82, N95), which cannot load the FP2 camera APIs. The app
+# loads whichever one works (pys60/lights.py).
+for m in torchhw torchhw_fp1; do
+  if [ -f ../native/out/$m.pyd ]; then
+    mkdir -p build/app/root/sys/bin
+    cp ../native/out/$m.pyd build/app/root/sys/bin/
+    echo "including native module $m.pyd"
+  fi
+done
 if [ -f ../native/out/retrotorch_rscfix.exe ]; then
   mkdir -p build/app/root/sys/bin build/app/root/resource/retrotorch
   cp ../native/out/retrotorch_rscfix.exe build/app/root/sys/bin/
   cp card/tree/resource/apps/appuifwmodule.rsc build/app/root/resource/retrotorch/
-  EXTRAS="--extrasdir=root"
   echo "including retrotorch_rscfix.exe (any-drive install)"
-else
-  echo "WARNING: ../native/out/torchhw.pyd not built: LED torch and keypad light will be missing"
+fi
+if [ -d build/app/root ]; then
+  EXTRAS="--extrasdir=root"
+fi
+if [ ! -f ../native/out/torchhw.pyd ] && [ ! -f ../native/out/torchhw_fp1.pyd ]; then
+  echo "WARNING: no native module built (native/build.sh): screen light and flash bursts only"
 fi
 
 OPTS="--uid=0xE7A3D5C4 --appname=RetroTorch --version=$VERSION \

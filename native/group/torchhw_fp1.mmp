@@ -1,0 +1,34 @@
+// torchhw_fp1.pyd: native lights helper for S60 3rd Edition FP1 phones
+// (Nokia N82, N95 and other Symbian OS 9.2 devices), Python for S60 1.4.5.
+//
+// Same source as torchhw.pyd, built with TORCHHW_FP1: the HWRM Light part
+// (keypad, extra lights, display brightness) and no camera code. FP1 ECam has
+// no New2L / MCameraObserver2 / CCameraAdvancedSettings, and linking those
+// would stop this module loading on FP1 — taking the lights down with it. The
+// app falls back to PyS60's camera module for flash bursts on these phones.
+//
+// It is still built with the FP2 SDK, but links only FP1-era libraries, so
+// the imports resolve on Symbian OS 9.2.
+TARGET          torchhw_fp1.pyd
+TARGETTYPE      dll
+UID             0x1000008d 0xE7A3D5C6
+// A PYD needs at least the capabilities of the app that loads it.
+CAPABILITY      LocalServices NetworkServices ReadUserData WriteUserData UserEnvironment
+VENDORID        0
+EPOCALLOWDLLDATA
+
+SOURCEPATH      ..\src
+SOURCE          torchhw.cpp
+
+USERINCLUDE     ..\src
+SYSTEMINCLUDE   \epoc32\include
+SYSTEMINCLUDE   \epoc32\include\python
+SYSTEMINCLUDE   \epoc32\include\libc
+
+MACRO           TORCHHW_FP1
+
+// No ecam.lib / ecamadvsettings.lib / fbscli.lib: see above.
+LIBRARY         python222.lib euser.lib hwrmlightclient.lib
+
+// the export list (inittorchhw at ordinal 1) is ..\eabi\torchhw_fp1.def
+NOSTRICTDEF

@@ -1,10 +1,10 @@
 # RetroTorch
 
-A torch app for the **Nokia N79** and other S60 3rd Edition phones. Its main light is the **camera's LED flash as a steady torch**, and it can also use every other light the phone has: the screen in any colour, the keypad light, and any extra lights the phone reports.
+A torch app for the **Nokia N79**, **N82** and other S60 3rd Edition phones (FP1 and FP2). Its main light is the **camera's LED flash as a steady torch**, and it can also use every other light the phone has: the screen in any colour, the keypad light, and any extra lights the phone reports.
 
 | | |
 |---|---|
-| **Phones** | Nokia S60 3rd Edition (FP1/FP2); written for and tested on a Nokia N79 |
+| **Phones** | Nokia S60 3rd Edition (FP1/FP2); written for and tested on a Nokia N79, and made to work on FP1 phones such as the N82 |
 | **Needs** | Python for S60 1.4.5 |
 | **Install** | Phone memory or memory card (tested on the N79 from the memory card) |
 
@@ -13,6 +13,7 @@ A torch app for the **Nokia N79** and other S60 3rd Edition phones. Its main lig
 ## Contents
 
 - [Features](#features)
+- [S60 3rd Edition FP1 phones](#s60-3rd-edition-fp1-phones)
 - [Requirements](#requirements)
 - [Install](#install)
 - [Using RetroTorch](#using-retrotorch)
@@ -27,7 +28,7 @@ A torch app for the **Nokia N79** and other S60 3rd Edition phones. Its main lig
 
 | Light | What it does |
 |---|---|
-| **LED torch** (default) | The camera's dual LED as a steady light, plus strobe, SOS, Morse and beacon. A one-time setup finds the way that lights the LED on your phone. |
+| **LED torch** (default) | The camera's dual LED as a steady light, plus strobe, SOS, Morse and beacon. A one-time setup finds the way that lights the LED on your phone. Not available on a phone with a xenon flash (N82): see below. |
 | **Screen light** | The whole screen in 10 colours (white, warm white, red night-vision, amber and more) with brightness control. Effects: steady, strobe, SOS, Morse, beacon, heartbeat, police, rainbow, candle, disco, warning. |
 | **Flash bursts** | Fires the LED as a photo flash, about one burst every two seconds. Works even without the native module. |
 | **Keypad light** | The keypad backlight, dimmable, with the same blink patterns. |
@@ -40,6 +41,25 @@ Also:
 - **Morse messages:** any text, flashed on any light.
 - **Crash guard:** if a piece of hardware ever makes the app close, RetroTorch switches that piece off at the next start and tells you. *Options → Retry all hardware* turns it back on.
 - **Hardware info:** lists the lights and camera flash modes your phone reports.
+
+## S60 3rd Edition FP1 phones
+
+RetroTorch also runs on S60 3rd Edition FP1 phones (Symbian OS 9.2), such as the
+**Nokia N82** and N95, as well as FP2 phones like the N79. FP1 needs a little
+different handling:
+
+- **No LED torch.** FP1's camera API has no continuous "video light", and the
+  N82's flash is a **xenon** tube: it fires for a photo and then has to recharge,
+  so it cannot be held on. RetroTorch says so on the home screen, and a fresh
+  install opens on the **screen light** instead.
+- **Flash bursts still work**, through Python for S60's camera module. A xenon
+  tube takes a second or two to recharge between bursts, so it blinks slower than
+  an LED phone and shouldn't be used for long.
+- **Keypad and extra lights** come from the HWRM Light service, the same as on
+  FP2. They live in a second native build, `torchhw_fp1.pyd`, which leaves the
+  camera out so that it loads on FP1; the app loads whichever build works.
+- Everything else — the screen light in any colour, the effects, Morse, the
+  auto-off timer — is the same on both.
 
 ## Requirements
 
@@ -92,6 +112,7 @@ The right softkey goes back to the list, and exits from the list.
 ## Troubleshooting
 
 - **The app does nothing when opened.** Check that Python for S60 1.4.5 is installed. If RetroTorch is on a different drive from Python and your phone isn't unlocked, see [Memory card](#memory-card).
+- **"Not on this phone (no camera video light)".** The camera has no video light, so the LED cannot stay on. Use the screen light or Flash bursts (see [S60 3rd Edition FP1 phones](#s60-3rd-edition-fp1-phones)).
 - **The LED torch never lights.** Run *Options → LED setup* again and wait a second after each try before answering. If none of the 9 ways work, send `E:\retrotorch_log.txt` in an issue.
 - **"RetroTorch closed last time while using …".** The crash guard switched that hardware off. *Options → Retry all hardware* turns it back on.
 - **A log** of every step is kept in `E:\retrotorch_log.txt` (or `C:\Data\`).
@@ -109,7 +130,7 @@ RetroTorch handles this itself. Its package includes a copy of the file and a ti
 
 ## How it works
 
-Python for S60 can't control the phone's lights, so RetroTorch includes a small native module, **`torchhw.pyd`** (C++, in `native/`), that gives Python:
+Python for S60 can't control the phone's lights, so RetroTorch includes a small native module (C++, in `native/`), in two builds: **`torchhw.pyd`** for S60 3rd Edition FP2 and **`torchhw_fp1.pyd`** for FP1 phones, which has the lights but no camera. It gives Python:
 
 - **HWRM Light API** (`CHWRMLight`): the display, keypad and extra light targets, with intensity and hardware blinking.
 - **ECam** (`CCamera`, `CCameraAdvancedSettings`): the camera's flash modes, including `EFlashVideoLight`, plus the viewfinder and video capture.
@@ -119,6 +140,7 @@ Things learned on a real N79:
 - The camera reports **video light** as a supported flash mode, and setting it returns no error. But the LED stays dark until the camera is in **video mode** (video capture prepared, viewfinder running off screen); then the video light comes on.
 - **Touching the camera while the screen is being drawn** (even counting cameras, or importing PyS60's `camera` module) closes the app without any Python error. RetroTorch only touches hardware after the UI is up, inside the crash guard.
 - The N79's light targets are `0x83`: display, keypad and custom target 4.
+- On S60 3rd Edition FP1 (N82) the camera API is older — no `CCamera::New2L`, no `CCameraAdvancedSettings` — and the flash is xenon, so RetroTorch ships the lights-only FP1 build and uses PyS60's camera module for flash bursts there.
 
 ## More apps for the Nokia N79
 
@@ -148,7 +170,8 @@ sh pys60/tests/preview/preview.sh /tmp/retrotorch-preview
 
 # native module: first set up the Symbian toolchain next to the repository
 cp -r tools/symbian-sdk ../symbian-sdk && sh ../symbian-sdk/setup.sh
-sh native/build.sh            # -> native/out/torchhw.pyd, retrotorch_rscfix.exe
+sh native/build.sh            # -> native/out/torchhw.pyd, torchhw_fp1.pyd,
+                              #    retrotorch_rscfix.exe
 
 # package -> pys60/dist/RetroTorch.sis
 sh pys60/build_sis.sh
@@ -161,8 +184,9 @@ The app is written for Python 2.2 (`pys60/tools/check_py22.py` and `check_ints.p
 ## Project layout
 
 ```
-native/              C++ (Symbian): torchhw.pyd and retrotorch_rscfix.exe
-  src/torchhw.cpp    HWRM lights and the camera LED, for Python
+native/              C++ (Symbian): torchhw.pyd, torchhw_fp1.pyd and retrotorch_rscfix.exe
+  src/torchhw.cpp    HWRM lights and the camera LED, for Python (one source:
+                     TORCHHW_FP1 builds the lights-only FP1 variant)
   rscfix/rscfix.cpp  run on install: puts appuifwmodule.rsc on the app's drive
   group/             Symbian build files (bld.inf, .mmp)
   eabi/              export list (inittorchhw at ordinal 1)

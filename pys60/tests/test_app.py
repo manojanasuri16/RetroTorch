@@ -248,6 +248,31 @@ no_paint_errors("no native")
 a4.quit()
 lights.torchhw = torchhw
 
+# ------------------------------------------------------------ FP1 native build
+
+# torchhw_fp1.pyd (S60 3rd Edition FP1: N82, N95) has the HWRM lights but no
+# camera code at all, so the LED torch must not be offered and a fresh install
+# starts on the screen light instead.
+real_apis = torchhw.cam_apis
+torchhw.cam_apis = lambda: 0
+check(lights.cam_apis() == 0 and lights.cam_api_list() == [], "FP1: no camera APIs")
+check(lights.led_methods() == [], "FP1: no LED methods to try")
+check(lights.default_start() == "screen", "FP1: screen light is the default start")
+a9 = new_app()
+check(keys(a9) == ["led", "screen", "flash", "hwrm2", "all"], "FP1 sources: %r" % keys(a9))
+check(a9.status(a9.led)[0] == 0 and a9.status(a9.led)[1].find(u"no camera video light") >= 0,
+      "FP1: LED unusable, got %r" % (a9.status(a9.led),))
+del appuifw.notes[:]
+a9.led_setup()
+check(appuifw.notes and appuifw.notes[-1][1].find(u"xenon") >= 0,
+      "FP1: LED setup explains why: %r" % (appuifw.notes[-1:],))
+a9.after_start()
+check(a9.src is a9.screen_src and a9.on == 1, "FP1: starts on the screen light")
+a9.back()
+no_paint_errors("fp1")
+check(a9.status(a9.sources[keys(a9).index("hwrm2")])[0] == 1, "FP1: keypad light still offered")
+torchhw.cam_apis = real_apis
+
 # ------------------------------------------------------------ default start
 
 # a fresh install opens straight into the LED torch (set up: turns it on)
